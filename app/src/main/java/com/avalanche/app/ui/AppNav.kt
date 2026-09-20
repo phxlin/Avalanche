@@ -8,10 +8,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -63,7 +63,7 @@ private const val TAB_SETTINGS = 3
 private val tabs = listOf(
     Tab("Home", Icons.Filled.Home),
     Tab("Debts", Icons.Filled.CreditCard),
-    Tab("Plan", Icons.Filled.Timeline),
+    Tab("Plan", Icons.AutoMirrored.Filled.TrendingDown),
     Tab("Settings", Icons.Filled.Settings),
 )
 

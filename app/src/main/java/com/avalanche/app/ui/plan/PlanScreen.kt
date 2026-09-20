@@ -15,10 +15,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -81,7 +81,7 @@ fun PlanScreen(onAddDebt: () -> Unit, onLogLumpSum: (Map<Long, Double>) -> Unit)
             !state.loaded -> LoadingBox(padding)
             selected == null || settings == null -> Box(Modifier.padding(padding).fillMaxSize()) {
                 EmptyState(
-                    icon = Icons.Filled.Timeline,
+                    icon = Icons.AutoMirrored.Filled.TrendingDown,
                     title = if (state.hasAnyDebt) "Nothing left to plan" else "Add a debt to build a plan",
                     body = if (state.hasAnyDebt) "Every debt is paid off. Nice work." else "The calculator ranks your debts and projects a month-by-month path to zero.",
                     actionLabel = "Add a debt",
