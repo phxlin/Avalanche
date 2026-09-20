@@ -1,0 +1,36 @@
+[versions]
+agp = "9.4.0"
+kotlin = "2.2.10"
+room = "2.7.2"
+lifecycle = "2.9.2"
+work = "2.10.3"
+
+[libraries]
+compose-bom = { module = "androidx.compose:compose-bom", version = "2025.08.00" }
+compose-ui = { module = "androidx.compose.ui:ui" }
+compose-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
+compose-tooling = { module = "androidx.compose.ui:ui-tooling" }
+compose-material = { module = "androidx.compose.material3:material3" }
+compose-icons = { module = "androidx.compose.material:material-icons-extended" }
+compose-ui-test = { module = "androidx.compose.ui:ui-test-junit4" }
+compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
+activity = { module = "androidx.activity:activity-compose", version = "1.10.1" }
+lifecycle-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
+lifecycle-vm = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+navigation = { module = "androidx.navigation:navigation-compose", version = "2.9.3" }
+room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
+room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
+room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
+work = { module = "androidx.work:work-runtime-ktx", version.ref = "work" }
+coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version = "1.10.2" }
+gson = { module = "com.google.code.gson:gson", version = "2.13.1" }
+junit = { module = "junit:junit", version = "4.13.2" }
+room-testing = { module = "androidx.room:room-testing", version.ref = "room" }
+android-junit = { module = "androidx.test.ext:junit", version = "1.2.1" }
+test-runner = { module = "androidx.test:runner", version = "1.6.2" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-kapt = { id = "org.jetbrains.kotlin.kapt", version.ref = "kotlin" }

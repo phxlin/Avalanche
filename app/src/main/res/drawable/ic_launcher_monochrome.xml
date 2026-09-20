@@ -1,0 +1,17 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Themed-icon layer: only alpha matters, so the snow cap and slide are drawn at reduced alpha over the solid silhouette. -->
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:scaleX="0.86"
+        android:scaleY="0.86">
+        <path android:fillColor="#FF000000" android:pathData="M16,82 L46,28 L60,54 L68,41 L94,82 Z" />
+        <path android:fillColor="#66000000" android:pathData="M46,28 L53,41 L50,45 L46.5,40 L43,46 L40.5,41.5 L37,44.2 Z" />
+        <path android:fillColor="#66000000" android:pathData="M68,41 L73.7,50 L71,49 L68.5,52.5 L66.5,48.5 L64,47.5 Z" />
+        <path android:fillColor="#66000000" android:pathData="M53,41 C58,58 64,66 74,82 L62,82 C58,72 52,62 50,45 Z" />
+    </group>
+</vector>

@@ -1,0 +1,26 @@
+# Build output and caches
+build/
+.gradle/
+.kotlin/
+captures/
+.externalNativeBuild
+.cxx
+*.apk
+*.aab
+*.hprof
+
+# Machine-specific
+local.properties
+# IDE-generated Gradle daemon JDK pin (includes a specific JDK build); the project builds on any JDK 17+.
+gradle/gradle-daemon-jvm.properties
+
+# IDEs and tools
+.idea/
+*.iml
+.claude/
+.DS_Store
+
+# Never commit signing material
+*.jks
+*.keystore
+keystore.properties
