@@ -146,15 +146,17 @@ app/src/main/java/com/avalanche/app/
 | --------------------- | ---------------------- |
 | Android Gradle Plugin | 9.4.0                  |
 | Gradle wrapper        | 9.6.0                  |
-| Kotlin                | 2.2.10 (kapt for Room) |
+| Kotlin                | 2.2.10                 |
+| KSP                   | 2.2.10-2.0.2           |
 | Compose BOM           | 2025.08.00             |
 | Room                  | 2.7.2                  |
 | JDK                   | 17 or newer            |
 
 Every library version is pinned in `gradle/libs.versions.toml`. Room's compiler
-runs through kapt, which is why `gradle.properties` keeps a few AGP 9 opt-outs
-(`android.builtInKotlin=false`, `android.newDsl=false`, …); moving Room to KSP
-would let them go.
+runs through KSP, and the build uses AGP 9's built-in Kotlin and its new DSL. KSP
+doesn't yet support built-in Kotlin's source-set rules on its own, so
+`gradle.properties` sets `android.disallowKotlinSourceSets=false` (AGP prints an
+"experimental" notice for it); it can go once KSP catches up.
 
 ### Rate limiting & batching
 
@@ -375,7 +377,7 @@ Instrumented (`./gradlew :app:connectedDebugAndroidTest`, 87 tests):
 ## Static analysis & performance
 
 * **Android lint** (`./gradlew :app:lintDebug`) — no errors; the remaining notices
-  are newer-dependency-version hints and the kapt-versus-KSP note.
+  are newer-dependency-version hints and the notice about the newest SDK level.
 * **Release build** — `assembleRelease` runs R8 with code and resource shrinking
   (`isMinifyEnabled` / `isShrinkResources`); the keep rules in `proguard-rules.pro`
   protect the backup format's field names. Signing is optional: with a
@@ -408,8 +410,10 @@ Instrumented (`./gradlew :app:connectedDebugAndroidTest`, 87 tests):
   constant. It says when the lines cross, not whether to save or pay debt first.
 * **Currency** — the currency setting changes how amounts are displayed; there is
   no conversion.
-* **kapt** — Room still uses kapt (hence the AGP opt-outs above); KSP would be
-  faster.
+* **KSP workaround** — `android.disallowKotlinSourceSets=false` is needed for KSP
+  with AGP 9's built-in Kotlin (see Toolchain) and shows as an experimental option.
+* **compileSdk / targetSdk 36** — Studio suggests SDK 37. It is left at 36 until the
+  new behaviour changes have been tested on a device.
 * **No CI** — a workflow running `testDebugUnitTest` + `lintDebug` + `assembleDebug`
   would catch regressions.
 
