@@ -93,7 +93,7 @@ class SavingsTest {
 
         val earning = SavingsProjector.project(setup(balance = 300.0, income = 2000.0, percent = 10.0, apy = 5.0), plan, 100.0)
         assertTrue(earning.savedAtDebtFree!! > 2300.0)
-        assertEquals(earning.savedAtDebtFree!! - 2300.0, earning.interestEarnedAtDebtFree!!, 1e-9)
+        assertEquals(earning.savedAtDebtFree - 2300.0, earning.interestEarnedAtDebtFree!!, 1e-9)
     }
 
     @Test

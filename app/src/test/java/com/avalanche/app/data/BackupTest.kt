@@ -4,6 +4,7 @@ import com.avalanche.app.domain.SavingsSetup
 import java.io.StringReader
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -38,12 +39,7 @@ class BackupTest {
     fun aNegativePreviousAprIsRejected() {
         val json = Backup.toJson(listOf(debt()), listOf(adjustment(-1.0)), AppSettings("USD"))
 
-        try {
-            Backup.parse(json)
-            fail("should have rejected a negative rate")
-        } catch (expected: BackupException) {
-            // expected
-        }
+        assertThrows(BackupException::class.java) { Backup.parse(json) }
     }
 
     @Test

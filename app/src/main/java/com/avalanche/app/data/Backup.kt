@@ -1,7 +1,6 @@
 package com.avalanche.app.data
 
 import com.avalanche.app.domain.SavingsLimits
-import com.avalanche.app.domain.SavingsSetup
 import com.avalanche.app.domain.Strategy
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
@@ -72,7 +71,7 @@ data class PaymentDto(
     val prevApr: Double? = null,
 )
 
-class BackupException(message: String) : Exception(message)
+class BackupException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
 data class ParsedBackup(val debts: List<DebtEntity>, val payments: List<PaymentEntity>, val settings: BackupSettings?)
 
@@ -90,7 +89,7 @@ object Backup {
         while (true) {
             val n = reader.read(buffer)
             if (n < 0) break
-            text.append(buffer, 0, n)
+            text.appendRange(buffer, 0, n)
             if (text.length > MAX_CHARS) throw BackupException("This file is too large to be an Avalanche backup.")
         }
         return text.toString()
@@ -125,7 +124,7 @@ object Backup {
         val file = try {
             gson.fromJson(json, BackupFile::class.java)
         } catch (e: JsonSyntaxException) {
-            throw BackupException("This file isn't valid JSON.")
+            throw BackupException("This file isn't valid JSON.", e)
         } ?: throw BackupException("This file is empty.")
 
         if (file.app != APP_ID) throw BackupException("This doesn't look like an Avalanche backup.")

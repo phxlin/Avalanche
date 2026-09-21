@@ -135,7 +135,7 @@ class DebtRepository(
             if (originalOverride != null) {
                 updated = updated.copy(
                     originalBalance = originalOverride,
-                    priorInterestPaid = if ((percentPaid ?: 0.0) > 0.0) priorInterest(originalOverride, startBalance, newApr, newMin) else 0.0,
+                    priorInterestPaid = if (percentPaid > 0.0) priorInterest(originalOverride, startBalance, newApr, newMin) else 0.0,
                 )
             }
             if (balanceChanged && !hasHistory) {

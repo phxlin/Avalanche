@@ -3,6 +3,7 @@ package com.avalanche.app.ui.settings
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.avalanche.app.data.AppSettings
@@ -23,6 +24,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+private const val TAG = "SettingsViewModel"
 
 class SettingsViewModel(
     private val repo: DebtRepository,
@@ -75,6 +78,7 @@ class SettingsViewModel(
                 }
                 "Backup saved."
             } catch (e: Exception) {
+                Log.w(TAG, "Couldn't save the backup", e)
                 "Couldn't save the backup."
             }
         }
@@ -92,6 +96,7 @@ class SettingsViewModel(
             } catch (e: BackupException) {
                 "Not restored: ${e.message}"
             } catch (e: Exception) {
+                Log.w(TAG, "Couldn't read the backup file", e)
                 "Couldn't read that file."
             }
         }

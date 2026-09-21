@@ -80,6 +80,7 @@ private val DarkKindColors = KindColors(
 
 val LocalKindColors = staticCompositionLocalOf { LightKindColors }
 
+@Suppress("UnusedReceiverParameter") // an extension only so it reads as MaterialTheme.kindColors, like colorScheme
 val MaterialTheme.kindColors: KindColors
     @Composable get() = LocalKindColors.current
 
