@@ -1,7 +1,6 @@
 [versions]
 agp = "9.4.0"
 kotlin = "2.2.10"
-ksp = "2.2.10-2.0.2"
 room = "2.7.2"
 lifecycle = "2.9.2"
 work = "2.10.3"
@@ -34,4 +33,4 @@ test-runner = { module = "androidx.test:runner", version = "1.6.2" }
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
-ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+kotlin-kapt = { id = "org.jetbrains.kotlin.kapt", version.ref = "kotlin" }

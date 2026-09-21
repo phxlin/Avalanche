@@ -3,8 +3,9 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.ksp)
+    alias(libs.plugins.kotlin.kapt)
 }
 
 // Release signing comes from an optional, git-ignored keystore.properties in the project root (see
@@ -70,8 +71,9 @@ kotlin {
     compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
 }
 
-ksp {
-    arg("room.schemaLocation", "$projectDir/schemas")
+kapt {
+    correctErrorTypes = true
+    arguments { arg("room.schemaLocation", "$projectDir/schemas") }
 }
 
 dependencies {
@@ -86,7 +88,7 @@ dependencies {
     implementation(libs.navigation)
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
-    ksp(libs.room.compiler)
+    kapt(libs.room.compiler)
     implementation(libs.work)
     implementation(libs.coroutines)
     implementation(libs.gson)
