@@ -151,6 +151,6 @@ Add android.sync.suppressAgpWarnings=LIBRARY_CONSTRAINTS_SHOULD_BE_DISABLED to t
 > Task :app:connectedDebugAndroidTest
 Running tests on devices: AI(AVD) - 14
 
-BUILD SUCCESSFUL in 20s
+BUILD SUCCESSFUL in 56s
 71 actionable tasks: 1 executed, 70 up-to-date
 Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.6.0/userguide/configuration_cache_enabling.html

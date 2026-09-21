@@ -2,6 +2,7 @@ package com.avalanche.app.ui
 
 import android.content.Context
 import android.os.SystemClock
+import androidx.lifecycle.viewModelScope
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -15,6 +16,7 @@ import com.avalanche.app.ui.payments.LogPaymentViewModel
 import com.avalanche.app.ui.plan.PlanViewModel
 import com.avalanche.app.ui.settings.SettingsViewModel
 import java.time.LocalDate
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -215,13 +217,19 @@ class ViewModelTest {
     @Test
     fun theSettingsScreenKnowsWhetherThereIsAnythingToReplace() = runBlocking<Unit> {
         val vm = SettingsViewModel(repo, settings, ApplicationProvider.getApplicationContext())
+        try {
+            assertEquals(false, withTimeout(5_000) { vm.hasData.first { it != null } }) // no debts yet
 
-        assertEquals(false, withTimeout(5_000) { vm.hasData.first { it != null } }) // no debts yet
+            repo.addDebt("Card", DebtType.CREDIT_CARD, 500.0, 0.0, 25.0)
 
-        repo.addDebt("Card", DebtType.CREDIT_CARD, 500.0, 0.0, 25.0)
-
-        assertEquals(true, withTimeout(5_000) { vm.hasData.first { it == true } })
+            assertEquals(true, withTimeout(5_000) { vm.hasData.first { it == true } })
+        } finally {
+            // hasData keeps its query alive for a few seconds after the last collector; stop it before tearDown
+            // closes the database, or the pending re-query fails with "connection pool has been closed".
+            vm.viewModelScope.cancel()
+        }
     }
+
     // ---------- PlanViewModel ----------
 
     @Test

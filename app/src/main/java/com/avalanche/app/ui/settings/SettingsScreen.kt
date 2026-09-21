@@ -47,6 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.avalanche.app.data.SettingsStore
 import com.avalanche.app.notifications.Notifications
 import com.avalanche.app.ui.components.ConfirmDialog
+import com.avalanche.app.ui.components.DELETE_CONFIRM_PHRASE
 import com.avalanche.app.ui.components.ScreenScaffold
 import com.avalanche.app.ui.components.SectionCard
 import com.avalanche.app.ui.appViewModel
@@ -216,6 +217,7 @@ fun SettingsScreen() {
             text = "Every debt and payment on this device will be permanently removed. Export a backup first if you might want it back.",
             confirmLabel = "Delete everything",
             destructive = true,
+            confirmPhrase = DELETE_CONFIRM_PHRASE,
             onConfirm = {
                 showDelete = false
                 vm.deleteEverything()

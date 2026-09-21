@@ -29,6 +29,7 @@ well as tappable (dark theme, Pixel 7 Pro):
 
    ```bash
    ./gradlew :app:assembleDebug        # build the APK
+   ./gradlew :app:assembleRelease      # R8-shrunk release APK (debug-signed, see below)
    ./gradlew :app:installDebug         # install on a running device/emulator
    ./gradlew :app:testDebugUnitTest    # JVM unit tests
    ./gradlew :app:connectedDebugAndroidTest   # instrumented + Compose UI tests (needs a device)
@@ -214,6 +215,10 @@ restores from one after a confirmation.
   payment pointing at a real debt) and only then are the tables replaced in one
   Room transaction. A rejected file changes nothing and says why. Files over 10 MB
   are refused.
+* **Delete all data** — the same section can wipe every debt and payment in one
+  transaction. The confirm button stays disabled until you type `DELETE` (any case),
+  so a stray tap can't erase everything. Export a backup first if you might want it
+  back.
 * **Not covered** — automatic or cloud backup. `allowBackup` is off so Android
   doesn't copy the database anywhere, which means exporting a file is the only
   backup, and it is plain, unencrypted JSON.
@@ -244,7 +249,7 @@ for Android 13+ themed icons; the notification icon is the mountain.
 
 ## Tests
 
-Unit (`./gradlew :app:testDebugUnitTest`, 90 tests):
+Unit (`./gradlew :app:testDebugUnitTest`, 93 tests):
 
 * `PayoffCalculatorTest` — amortisation maths, avalanche / snowball ordering and
   tie-breaks, minimums rolling over, lump sums, payoff-date ordering, the balance
@@ -258,10 +263,12 @@ Unit (`./gradlew :app:testDebugUnitTest`, 90 tests):
   history, totals, the interest estimate and the backup format round trip
 * `BackupTest` — the previous-APR and already-paid fields, and the import size limit
 * `ImportPromptTest` — the import dialog only warns about replacing data when there is data
+* `DeleteConfirmationTest` — the typed word matches whatever its case or surrounding
+  spaces, and nothing else does
 * `SettingsStoreTest` / `ReminderRuleTest` / `FormattersTest` — settings storage,
   the reminder timing rule, and number / date / decimal-input handling
 
-Instrumented (`./gradlew :app:connectedDebugAndroidTest`, 65 tests):
+Instrumented (`./gradlew :app:connectedDebugAndroidTest`, 69 tests):
 
 * `DebtRepositoryTest` — the real repository on an in-memory Room database: payment
   splitting, undo, adjustments, rate changes (including a 0% promo ending),
@@ -275,6 +282,8 @@ Instrumented (`./gradlew :app:connectedDebugAndroidTest`, 65 tests):
 * `DebtCardTest` / `ComparisonCardTest` — real Compose layout and touch input: three
   tags wrap without clipping the card, and tapping a strategy box selects it and is
   announced as a selected radio choice
+* `ConfirmDialogTest` — the *Delete all data* confirm button stays disabled until
+  `DELETE` is typed, does nothing while disabled, and Cancel never confirms
 
 ## Static analysis & performance
 
@@ -282,9 +291,15 @@ Instrumented (`./gradlew :app:connectedDebugAndroidTest`, 65 tests):
   are newer-dependency-version hints and the kapt-versus-KSP note.
 * **Release build** — `assembleRelease` runs R8 with code and resource shrinking
   (`isMinifyEnabled` / `isShrinkResources`); the keep rules in `proguard-rules.pro`
-  protect the backup format's field names. It is unsigned, so installing or
-  distributing it needs your own keystore (`*.jks`, `*.keystore` and
-  `keystore.properties` are git-ignored).
+  protect the backup format's field names. Signing is optional: with a
+  `keystore.properties` in the project root (copy `keystore.properties.example`;
+  it and `*.jks` / `*.keystore` are git-ignored) the release APK is signed with your
+  own key, and without one it falls back to the debug key, so a fresh clone still
+  builds an APK that installs as-is with
+  `adb install app/build/outputs/apk/release/app-release.apk`. The debug key is for
+  local use only, and it differs per machine, so an APK signed on another computer
+  can't update the installed app: export a backup before switching keys or machines,
+  because Android will make you uninstall first.
 
 ## Known limitations / TODO
 
