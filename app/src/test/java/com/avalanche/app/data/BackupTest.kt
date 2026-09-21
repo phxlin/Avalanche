@@ -1,8 +1,10 @@
 package com.avalanche.app.data
 
+import com.avalanche.app.domain.SavingsSetup
 import java.io.StringReader
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 
@@ -75,5 +77,40 @@ class BackupTest {
         val text = "x".repeat(Backup.MAX_CHARS)
 
         assertEquals(Backup.MAX_CHARS, Backup.readBounded(StringReader(text)).length)
+    }
+
+    // ---------- savings ----------
+
+    private val savings = SavingsSetup(balance = 2500.5, monthlyIncome = 4200.0, percentSaved = 12.5, apy = 4.35)
+
+    private fun restored(json: String, current: AppSettings = AppSettings("USD")) =
+        Backup.applyTo(current, Backup.parse(json).settings)
+
+    @Test
+    fun theSavingsDetailsSurviveABackupRoundTrip() {
+        val json = Backup.toJson(listOf(debt()), emptyList(), AppSettings("USD", savings = savings))
+
+        assertEquals(savings, restored(json).savings)
+    }
+
+    @Test
+    fun aBackupMadeWithoutSavingsLeavesTheSavingsHereAlone() {
+        // Backups from before savings existed have no such block; importing one shouldn't erase what was set up since.
+        val json = Backup.toJson(listOf(debt()), emptyList(), AppSettings("USD"))
+
+        assertEquals(savings, restored(json, AppSettings("USD", savings = savings)).savings)
+        assertNull(restored(json).savings)
+    }
+
+    @Test
+    fun anInvalidSavingsBlockIsIgnoredRatherThanRejectingTheBackup() {
+        val good = Backup.toJson(listOf(debt()), emptyList(), AppSettings("USD", savings = savings))
+        val tooMuch = good.replace("\"percentSaved\": 12.5", "\"percentSaved\": 250")
+        val missing = good.lines().filterNot { it.contains("monthlyIncome") }.joinToString("\n")
+
+        assertTrue(tooMuch != good && missing != good)
+        assertNull(restored(tooMuch).savings)
+        assertNull(restored(missing).savings)
+        assertEquals(savings, restored(tooMuch, AppSettings("USD", savings = savings)).savings)
     }
 }

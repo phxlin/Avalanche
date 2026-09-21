@@ -1,5 +1,7 @@
 package com.avalanche.app.data
 
+import com.avalanche.app.domain.SavingsLimits
+import com.avalanche.app.domain.SavingsSetup
 import com.avalanche.app.domain.Strategy
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
@@ -24,6 +26,15 @@ data class BackupSettings(
     val currency: String? = null,
     val extraMonthly: Double? = null,
     val strategy: String? = null,
+    /** Absent in backups made before savings existed, and when savings aren't set up. */
+    val savings: BackupSavings? = null,
+)
+
+data class BackupSavings(
+    val balance: Double? = null,
+    val monthlyIncome: Double? = null,
+    val percentSaved: Double? = null,
+    val apy: Double? = null,
 )
 
 data class DebtDto(
@@ -91,7 +102,10 @@ object Backup {
                 app = APP_ID,
                 version = VERSION,
                 exportedAt = now.toString(),
-                settings = BackupSettings(settings.currency, settings.extraMonthly, settings.strategy.name),
+                settings = BackupSettings(
+                    settings.currency, settings.extraMonthly, settings.strategy.name,
+                    settings.savings?.let { BackupSavings(it.balance, it.monthlyIncome, it.percentSaved, it.apy) },
+                ),
                 debts = debts.map {
                     DebtDto(
                         it.id, it.name, it.type, it.originalBalance, it.currentBalance, it.apr, it.minPayment,
@@ -172,6 +186,8 @@ object Backup {
             currency = backup.currency?.takeIf { SettingsStore.isValidCurrency(it) } ?: current.currency,
             extraMonthly = backup.extraMonthly?.takeIf { it.isFinite() && it >= 0 } ?: current.extraMonthly,
             strategy = runCatching { Strategy.valueOf(backup.strategy ?: "") }.getOrDefault(current.strategy),
+            // Like the other settings, a missing or invalid block leaves what is here alone.
+            savings = backup.savings?.let { SavingsLimits.validated(it.balance, it.monthlyIncome, it.percentSaved, it.apy) } ?: current.savings,
         )
     }
 }

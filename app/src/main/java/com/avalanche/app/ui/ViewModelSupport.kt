@@ -27,6 +27,13 @@ inline fun <reified VM : ViewModel> appViewModel(key: String? = null, crossinlin
 }
 
 /** Builds the payoff plan for the user's current debts and settings (recomputed whenever either changes). */
+/**
+ * What goes to debt each month: every debt's minimum (a cleared debt's minimum keeps rolling to the rest, exactly as the payoff
+ * calculator budgets it) plus the extra amount.
+ */
+fun monthlyDebtBudget(debts: List<DebtEntity>, extraMonthly: Double): Double =
+    debts.sumOf { it.minPayment } + maxOf(0.0, extraMonthly)
+
 fun buildPlan(
     debts: List<DebtEntity>,
     settings: AppSettings,

@@ -25,9 +25,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -51,6 +48,7 @@ import com.avalanche.app.data.DebtEntity
 import com.avalanche.app.domain.MonthPlan
 import com.avalanche.app.domain.PayoffPlan
 import com.avalanche.app.domain.Strategy
+import com.avalanche.app.ui.components.CollapsibleCard
 import com.avalanche.app.ui.components.DecimalField
 import com.avalanche.app.ui.components.EmptyState
 import com.avalanche.app.ui.components.PayoffTimeline
@@ -58,6 +56,7 @@ import com.avalanche.app.ui.components.PlanLine
 import com.avalanche.app.ui.components.ProjectedBalanceChart
 import com.avalanche.app.ui.components.LoadingBox
 import com.avalanche.app.ui.components.ScreenScaffold
+import com.avalanche.app.ui.components.SavingsLine
 import com.avalanche.app.ui.components.SectionCard
 import com.avalanche.app.ui.components.TimelineItem
 import com.avalanche.app.ui.components.money
@@ -95,6 +94,11 @@ fun PlanScreen(onAddDebt: () -> Unit, onLogLumpSum: (Map<Long, Double>) -> Unit)
                 val snowball = state.snowball ?: selected
                 val schedule = remember { mutableStateListOf<Int>() }
                 var showAll by rememberSaveable { mutableStateOf(false) }
+                var showSavings by rememberSaveable { mutableStateOf(false) }
+                // The secondary cards start folded so the screen opens on the answer (date, strategy, chart). A lump sum that
+                // is already being previewed opens its card, since it is what the chart and schedule are showing.
+                var lumpOpen by rememberSaveable { mutableStateOf(vm.lumpText.isNotBlank()) }
+                var orderOpen by rememberSaveable { mutableStateOf(false) }
                 val visibleMonths = if (showAll) shown.months else shown.months.take(12)
 
                 LazyColumn(
@@ -102,18 +106,9 @@ fun PlanScreen(onAddDebt: () -> Unit, onLogLumpSum: (Map<Long, Double>) -> Unit)
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    item { SummaryCard(selected) }
                     item {
-                        SectionCard(title = "Strategy") {
-                            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                                Strategy.entries.forEachIndexed { i, s ->
-                                    SegmentedButton(
-                                        selected = settings.strategy == s,
-                                        onClick = { vm.setStrategy(s) },
-                                        shape = SegmentedButtonDefaults.itemShape(i, Strategy.entries.size),
-                                    ) { Text(s.label) }
-                                }
-                            }
-                            Text(settings.strategy.blurb, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        ComparisonCard(avalanche, snowball, settings.strategy, onSelect = vm::setStrategy) {
                             DecimalField(
                                 value = vm.extraText,
                                 onValueChange = vm::onExtraChanged,
@@ -122,22 +117,62 @@ fun PlanScreen(onAddDebt: () -> Unit, onLogLumpSum: (Map<Long, Double>) -> Unit)
                             )
                         }
                     }
-                    item { SummaryCard(selected) }
-                    if (selected.converges) {
-                        item { ComparisonCard(avalanche, snowball, settings.strategy, onSelect = vm::setStrategy) }
-                    }
-                    item { LumpSumCard(vm, state, onLogLumpSum) }
                     item {
-                        // This is the order extra money is aimed in, not the order debts finish (the timeline below shows that,
+                        val lines = buildList {
+                            add(PlanLine("Avalanche", avalanche, MaterialTheme.colorScheme.primary))
+                            add(PlanLine("Snowball", snowball, MaterialTheme.kindColors.installment, dashed = true))
+                            state.lump?.let { add(PlanLine("With lump sum", it.plan, MaterialTheme.colorScheme.tertiary)) }
+                        }
+                        // Both strategies pay the same total every month, so their balance curves are often almost identical.
+                        val gap = if (avalanche.converges && snowball.converges) avalanche.maxBalanceGap(snowball) else null
+                        val overlapping = gap != null && gap <= 0.01 * avalanche.startBalance
+                        SectionCard(
+                            title = "Projected balance",
+                            subtitle = if (state.savings?.curve.isNullOrEmpty()) "Total debt month by month" else "Total debt month by month, with your savings",
+                        ) {
+                            ProjectedBalanceChart(
+                                lines,
+                                savings = state.savings?.curve?.takeIf { it.isNotEmpty() }?.let { SavingsLine(it, MaterialTheme.kindColors.savings) },
+                            )
+                            if (gap != null && overlapping) {
+                                Text(
+                                    "Avalanche and Snowball stay within ${money(gap)} of each other, so their lines overlap. " +
+                                        "The difference shows up in interest, not in the balance curve.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                    if (shown.converges) {
+                        item {
+                            val palette = listOf(MaterialTheme.colorScheme.primary, MaterialTheme.kindColors.installment, MaterialTheme.colorScheme.tertiary, MaterialTheme.colorScheme.secondary)
+                            SectionCard(title = "Payoff timeline", subtitle = "When each debt reaches zero") {
+                                // Soonest first. Colours stay tied to each debt's place in the payoff order below.
+                                val colorById = shown.priorityOrder.withIndex().associate { (i, id) -> id to palette[i % palette.size] }
+                                PayoffTimeline(
+                                    shown.payoffDateOrder().map { id ->
+                                        TimelineItem(nameById[id] ?: "Debt", shown.payoffMonthIndex[id], shown.payoffMonth(id)?.let { formatMonth(it) } ?: "-", colorById.getValue(id))
+                                    },
+                                )
+                            }
+                        }
+                    }
+                    item { SavingsCard(state.savings, selected, onEdit = { showSavings = true }) }
+                    item { LumpSumCard(vm, state, onLogLumpSum, expanded = lumpOpen, onToggle = { lumpOpen = !lumpOpen }) }
+                    item {
+                        // This is the order extra money is aimed in, not the order debts finish (the timeline above shows that,
                         // soonest first): a small low-APR debt can be cleared by its own minimum long before a big high-APR one.
                         val debtById = state.activeDebts.associateBy { it.id }
-                        SectionCard(
+                        CollapsibleCard(
                             title = "Where extra money goes",
                             subtitle = if (shown.strategy == Strategy.AVALANCHE) {
                                 "Highest APR first. Once a debt is cleared, its payment moves down the list."
                             } else {
                                 "Smallest balance first. Once a debt is cleared, its payment moves down the list."
                             },
+                            expanded = orderOpen,
+                            onToggle = { orderOpen = !orderOpen },
                         ) {
                             shown.priorityOrder.forEachIndexed { i, id ->
                                 val debt = debtById[id]
@@ -155,40 +190,7 @@ fun PlanScreen(onAddDebt: () -> Unit, onLogLumpSum: (Map<Long, Double>) -> Unit)
                             }
                         }
                     }
-                    item {
-                        val lines = buildList {
-                            add(PlanLine("Avalanche", avalanche, MaterialTheme.colorScheme.primary))
-                            add(PlanLine("Snowball", snowball, MaterialTheme.kindColors.installment, dashed = true))
-                            state.lump?.let { add(PlanLine("With lump sum", it.plan, MaterialTheme.colorScheme.tertiary)) }
-                        }
-                        // Both strategies pay the same total every month, so their balance curves are often almost identical.
-                        val gap = if (avalanche.converges && snowball.converges) avalanche.maxBalanceGap(snowball) else null
-                        val overlapping = gap != null && gap <= 0.01 * avalanche.startBalance
-                        SectionCard(title = "Projected balance", subtitle = "Total debt month by month") {
-                            ProjectedBalanceChart(lines)
-                            if (gap != null && overlapping) {
-                                Text(
-                                    "Avalanche and Snowball stay within ${money(gap)} of each other, so their lines overlap. " +
-                                        "The difference shows up in interest, not in the balance curve.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    }
                     if (shown.converges) {
-                        item {
-                            val palette = listOf(MaterialTheme.colorScheme.primary, MaterialTheme.kindColors.installment, MaterialTheme.colorScheme.tertiary, MaterialTheme.colorScheme.secondary)
-                            SectionCard(title = "Payoff timeline", subtitle = "When each debt reaches zero") {
-                                // Soonest first. Colours stay tied to each debt's place in the payoff order above.
-                                val colorById = shown.priorityOrder.withIndex().associate { (i, id) -> id to palette[i % palette.size] }
-                                PayoffTimeline(
-                                    shown.payoffDateOrder().map { id ->
-                                        TimelineItem(nameById[id] ?: "Debt", shown.payoffMonthIndex[id], shown.payoffMonth(id)?.let { formatMonth(it) } ?: "-", colorById.getValue(id))
-                                    },
-                                )
-                            }
-                        }
                         item {
                             Column(Modifier.padding(top = 4.dp)) {
                                 Text("Month-by-month schedule", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -200,7 +202,7 @@ fun PlanScreen(onAddDebt: () -> Unit, onLogLumpSum: (Map<Long, Double>) -> Unit)
                                     Text(
                                         "This month's payment is already made on ${joinNames(alreadyPaid)}, so the first month leaves out " +
                                             (if (alreadyPaid.size == 1) "its minimum. " else "their minimums. ") +
-                                            "Your extra money still goes by the order above. Edit a debt to change that.",
+                                            "Your extra money still goes by the order in \"Where extra money goes\". Edit a debt to change that.",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
@@ -224,6 +226,24 @@ fun PlanScreen(onAddDebt: () -> Unit, onLogLumpSum: (Map<Long, Double>) -> Unit)
                         }
                     }
                 }
+                if (showSavings) {
+                    SavingsDialog(
+                        initial = settings.savings,
+                        onSave = { setup ->
+                            vm.saveSavings(setup)
+                            showSavings = false
+                        },
+                        onRemove = if (settings.savings != null) {
+                            {
+                                vm.removeSavings()
+                                showSavings = false
+                            }
+                        } else {
+                            null
+                        },
+                        onDismiss = { showSavings = false },
+                    )
+                }
             }
         }
     }
@@ -235,7 +255,7 @@ private fun SummaryCard(plan: PayoffPlan) {
         if (!plan.converges) {
             Text("Not on track yet", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
             Text(
-                "At least one debt's minimum doesn't cover its monthly interest, so it never reaches zero. Raise an extra monthly amount above to see a payoff date.",
+                "At least one debt's minimum doesn't cover its monthly interest, so it never reaches zero. Raise the extra monthly amount below to see a payoff date.",
                 style = MaterialTheme.typography.bodyMedium,
             )
             return@SectionCard
@@ -265,12 +285,20 @@ private fun SummaryCard(plan: PayoffPlan) {
 }
 
 @Composable
-internal fun ComparisonCard(avalanche: PayoffPlan, snowball: PayoffPlan, current: Strategy, onSelect: (Strategy) -> Unit) {
-    SectionCard(title = "Avalanche vs. snowball", subtitle = "Same monthly budget, different order. Tap one to plan with it.") {
+internal fun ComparisonCard(
+    avalanche: PayoffPlan,
+    snowball: PayoffPlan,
+    current: Strategy,
+    onSelect: (Strategy) -> Unit,
+    /** Anything that belongs with the strategy, such as the extra-per-month field. */
+    extra: @Composable () -> Unit = {},
+) {
+    SectionCard(title = "Strategy", subtitle = "Same monthly budget, different order. Tap one to plan with it.") {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             ComparisonColumn(avalanche, highlighted = current == Strategy.AVALANCHE, onClick = { onSelect(Strategy.AVALANCHE) }, modifier = Modifier.weight(1f))
             ComparisonColumn(snowball, highlighted = current == Strategy.SNOWBALL, onClick = { onSelect(Strategy.SNOWBALL) }, modifier = Modifier.weight(1f))
         }
+        Text(current.blurb, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         val verdict = when {
             !avalanche.converges || !snowball.converges -> null
             snowball.totalInterest - avalanche.totalInterest >= 0.5 ->
@@ -287,6 +315,7 @@ internal fun ComparisonCard(avalanche: PayoffPlan, snowball: PayoffPlan, current
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        extra()
     }
 }
 
@@ -324,9 +353,15 @@ private fun ComparisonColumn(plan: PayoffPlan, highlighted: Boolean, onClick: ()
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun LumpSumCard(vm: PlanViewModel, state: PlanUiState, onLogLumpSum: (Map<Long, Double>) -> Unit) {
+private fun LumpSumCard(vm: PlanViewModel, state: PlanUiState, onLogLumpSum: (Map<Long, Double>) -> Unit, expanded: Boolean, onToggle: () -> Unit) {
     val nameById = state.activeDebts.associate { it.id to it.name }
-    SectionCard(title = "One-time lump sum", subtitle = "Bonus, tax refund, gift: see what it does to your plan") {
+    CollapsibleCard(
+        title = "One-time lump sum",
+        // Folded up, the header still says when a preview is changing the chart and schedule.
+        subtitle = state.lump?.let { "Previewing ${money(it.applied)} in the chart and schedule" } ?: "Bonus, tax refund, gift: see what it does to your plan",
+        expanded = expanded,
+        onToggle = onToggle,
+    ) {
         DecimalField(value = vm.lumpText, onValueChange = vm::onLumpChanged, label = "Amount")
         Text("Apply it to", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -2,6 +2,8 @@ package com.avalanche.app.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.avalanche.app.domain.SavingsLimits
+import com.avalanche.app.domain.SavingsSetup
 import com.avalanche.app.domain.Strategy
 import java.time.LocalDateTime
 import java.time.YearMonth
@@ -18,6 +20,8 @@ data class AppSettings(
     val remindersEnabled: Boolean = false,
     val reminderDay: Int = 1,
     val celebrationsEnabled: Boolean = true,
+    /** The optional savings account shown next to the payoff plan; null until the user sets it up. */
+    val savings: SavingsSetup? = null,
 )
 
 /** Small key-value store for preferences. Plain SharedPreferences keeps this dependency-free and fully local. */
@@ -34,6 +38,15 @@ class SettingsStore(private val prefs: SharedPreferences) {
         remindersEnabled = prefs.getBoolean(KEY_REMINDERS, false),
         reminderDay = prefs.getInt(KEY_REMINDER_DAY, 1).coerceIn(1, 28),
         celebrationsEnabled = prefs.getBoolean(KEY_CELEBRATE, true),
+        savings = loadSavings(),
+    )
+
+    /** Saved as text like [KEY_EXTRA], so cents stay exact. Anything missing, unreadable or out of range means "not set up". */
+    private fun loadSavings(): SavingsSetup? = SavingsLimits.validated(
+        prefs.getString(KEY_SAVINGS_BALANCE, null)?.toDoubleOrNull(),
+        prefs.getString(KEY_SAVINGS_INCOME, null)?.toDoubleOrNull(),
+        prefs.getString(KEY_SAVINGS_PERCENT, null)?.toDoubleOrNull(),
+        prefs.getString(KEY_SAVINGS_APY, null)?.toDoubleOrNull(),
     )
 
     /**
@@ -57,6 +70,17 @@ class SettingsStore(private val prefs: SharedPreferences) {
             .putBoolean(KEY_REMINDERS, next.remindersEnabled)
             .putInt(KEY_REMINDER_DAY, next.reminderDay.coerceIn(1, 28))
             .putBoolean(KEY_CELEBRATE, next.celebrationsEnabled)
+            .also { edit ->
+                val savings = next.savings
+                if (savings == null) {
+                    edit.remove(KEY_SAVINGS_BALANCE).remove(KEY_SAVINGS_INCOME).remove(KEY_SAVINGS_PERCENT).remove(KEY_SAVINGS_APY)
+                } else {
+                    edit.putString(KEY_SAVINGS_BALANCE, savings.balance.toString())
+                    edit.putString(KEY_SAVINGS_INCOME, savings.monthlyIncome.toString())
+                    edit.putString(KEY_SAVINGS_PERCENT, savings.percentSaved.toString())
+                    edit.putString(KEY_SAVINGS_APY, savings.apy.toString())
+                }
+            }
             .apply()
     }
 
@@ -78,6 +102,10 @@ class SettingsStore(private val prefs: SharedPreferences) {
         private const val KEY_REMINDERS = "reminders_enabled"
         private const val KEY_REMINDER_DAY = "reminder_day"
         private const val KEY_CELEBRATE = "celebrations_enabled"
+        private const val KEY_SAVINGS_BALANCE = "savings_balance_text"
+        private const val KEY_SAVINGS_INCOME = "savings_income_text"
+        private const val KEY_SAVINGS_PERCENT = "savings_percent_text"
+        private const val KEY_SAVINGS_APY = "savings_apy_text"
         private const val KEY_LAST_REMINDER = "last_reminder_month"
         private const val KEY_REMINDER_SCHEDULED_AT = "reminder_scheduled_at"
 

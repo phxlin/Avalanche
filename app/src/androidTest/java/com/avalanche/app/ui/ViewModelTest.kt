@@ -11,6 +11,7 @@ import com.avalanche.app.data.AppDatabase
 import com.avalanche.app.data.DebtRepository
 import com.avalanche.app.data.DebtType
 import com.avalanche.app.data.SettingsStore
+import com.avalanche.app.domain.SavingsSetup
 import com.avalanche.app.ui.debts.EditDebtViewModel
 import com.avalanche.app.ui.payments.LogPaymentViewModel
 import com.avalanche.app.ui.plan.PlanViewModel
@@ -20,6 +21,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlin.time.Duration.Companion.seconds
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -218,11 +220,11 @@ class ViewModelTest {
     fun theSettingsScreenKnowsWhetherThereIsAnythingToReplace() = runBlocking<Unit> {
         val vm = SettingsViewModel(repo, settings, ApplicationProvider.getApplicationContext())
         try {
-            assertEquals(false, withTimeout(5_000) { vm.hasData.first { it != null } }) // no debts yet
+            assertEquals(false, withTimeout(5.seconds) { vm.hasData.first { it != null } }) // no debts yet
 
             repo.addDebt("Card", DebtType.CREDIT_CARD, 500.0, 0.0, 25.0)
 
-            assertEquals(true, withTimeout(5_000) { vm.hasData.first { it == true } })
+            assertEquals(true, withTimeout(5.seconds) { vm.hasData.first { it == true } })
         } finally {
             // hasData keeps its query alive for a few seconds after the last collector; stop it before tearDown
             // closes the database, or the pending re-query fails with "connection pool has been closed".
@@ -252,5 +254,30 @@ class ViewModelTest {
         assertEquals(12.0, settings.settings.value.extraMonthly, 0.0)
         assertEquals("12.", vm.extraText)
         assertTrue(vm.extraText.endsWith("."))
+    }
+
+    @Test
+    fun savingSavingsAddsAProjectionLinedUpWithThePlanAndRemovingThemClearsIt() = runBlocking<Unit> {
+        repo.addDebt("Card", DebtType.CREDIT_CARD, 1000.0, 0.0, 100.0)
+        val vm = PlanViewModel(repo, settings)
+        try {
+            val before = withTimeout(5.seconds) { vm.state.first { it.loaded && it.selected != null } }
+            assertNull(before.savings)
+
+            vm.saveSavings(SavingsSetup(balance = 0.0, monthlyIncome = 2000.0, percentSaved = 10.0, apy = 0.0))
+
+            val withSavings = withTimeout(5.seconds) { vm.state.first { it.savings != null } }
+            val projection = withSavings.savings!!
+            assertEquals(withSavings.selected!!.balanceCurve().size, projection.curve.size)
+            assertEquals(4, projection.crossoverMonthIndex)
+            assertEquals(2000.0, projection.savedAtDebtFree!!, 1e-6)
+
+            vm.removeSavings()
+
+            withTimeout(5.seconds) { vm.state.first { it.loaded && it.savings == null } }
+            assertNull(settings.settings.value.savings)
+        } finally {
+            vm.viewModelScope.cancel() // see the settings test above
+        }
     }
 }

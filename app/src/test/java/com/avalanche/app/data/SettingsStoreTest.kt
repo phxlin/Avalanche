@@ -1,10 +1,12 @@
 package com.avalanche.app.data
 
+import com.avalanche.app.domain.SavingsSetup
 import com.avalanche.app.domain.Strategy
 import java.time.LocalDateTime
 import java.time.YearMonth
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -62,5 +64,46 @@ class SettingsStoreTest {
         store.reminderScheduledAt = LocalDateTime.of(2026, 3, 16, 10, 30)
         assertEquals(YearMonth.of(2026, 3), SettingsStore(prefs).lastReminderMonth)
         assertEquals(LocalDateTime.of(2026, 3, 16, 10, 30), SettingsStore(prefs).reminderScheduledAt)
+    }
+
+    @Test
+    fun savingsRoundTripWithExactCents() {
+        val prefs = FakeSharedPreferences()
+        val setup = SavingsSetup(balance = 12345.67, monthlyIncome = 4210.55, percentSaved = 12.25, apy = 4.35)
+
+        SettingsStore(prefs).update { it.copy(savings = setup) }
+
+        assertEquals(setup, SettingsStore(prefs).settings.value.savings)
+    }
+
+    @Test
+    fun savingsAreNotSetUpByDefaultAndRemovingThemForgetsEverything() {
+        val prefs = FakeSharedPreferences()
+        val store = SettingsStore(prefs)
+        assertNull(store.settings.value.savings)
+
+        store.update { it.copy(savings = SavingsSetup(100.0, 3000.0, 10.0, 4.0)) }
+        assertNotNull(SettingsStore(prefs).settings.value.savings)
+
+        store.update { it.copy(savings = null) }
+        assertNull(SettingsStore(prefs).settings.value.savings)
+        assertFalse(prefs.contains("savings_income_text"))
+    }
+
+    @Test
+    fun corruptOrOutOfRangeSavingsReadBackAsNotSetUp() {
+        fun withValue(key: String, value: String) = FakeSharedPreferences().apply {
+            values["savings_balance_text"] = "100"
+            values["savings_income_text"] = "3000"
+            values["savings_percent_text"] = "10"
+            values["savings_apy_text"] = "4"
+            values[key] = value
+        }
+
+        assertNotNull(SettingsStore(withValue("savings_apy_text", "4")).settings.value.savings)
+        assertNull(SettingsStore(withValue("savings_apy_text", "abc")).settings.value.savings)
+        assertNull(SettingsStore(withValue("savings_percent_text", "500")).settings.value.savings)
+        assertNull(SettingsStore(withValue("savings_income_text", "-1")).settings.value.savings)
+        assertNull(SettingsStore(FakeSharedPreferences().apply { values["savings_balance_text"] = "100" }).settings.value.savings)
     }
 }

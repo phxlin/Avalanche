@@ -178,9 +178,13 @@ class DebtRepository(
 
     suspend fun deleteDebt(id: Long) = debtDao.delete(id)
 
-    suspend fun deleteAll() = db.withTransaction {
-        paymentDao.deleteAll()
-        debtDao.deleteAll()
+    /** Wipes every debt and payment, and the savings details (income and balance are personal too). Other settings stay. */
+    suspend fun deleteAll() {
+        db.withTransaction {
+            paymentDao.deleteAll()
+            debtDao.deleteAll()
+        }
+        settings.update { it.copy(savings = null) }
     }
 
     /**

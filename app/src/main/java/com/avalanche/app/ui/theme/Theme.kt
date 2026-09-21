@@ -63,15 +63,19 @@ data class KindColors(
     val installment: Color,
     val installmentContainer: Color,
     val onInstallmentContainer: Color,
+    /** The savings line next to the debt lines on the plan chart. */
+    val savings: Color,
 )
 
 private val LightKindColors = KindColors(
     revolving = Color(0xFFB35A00), revolvingContainer = Color(0xFFFFDCC2), onRevolvingContainer = Color(0xFF311300),
     installment = Color(0xFF5A57B8), installmentContainer = Color(0xFFE3E0FF), onInstallmentContainer = Color(0xFF14106B),
+    savings = Color(0xFF1B7F4B),
 )
 private val DarkKindColors = KindColors(
     revolving = Color(0xFFFFB77C), revolvingContainer = Color(0xFF703700), onRevolvingContainer = Color(0xFFFFDCC2),
     installment = Color(0xFFC3C0FF), installmentContainer = Color(0xFF423F9B), onInstallmentContainer = Color(0xFFE3E0FF),
+    savings = Color(0xFF7FD6A0),
 )
 
 val LocalKindColors = staticCompositionLocalOf { LightKindColors }

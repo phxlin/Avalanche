@@ -13,9 +13,13 @@ import com.avalanche.app.data.SettingsStore
 import com.avalanche.app.data.isPaidOff
 import com.avalanche.app.domain.LumpSum
 import com.avalanche.app.domain.PayoffPlan
+import com.avalanche.app.domain.SavingsProjection
+import com.avalanche.app.domain.SavingsProjector
+import com.avalanche.app.domain.SavingsSetup
 import com.avalanche.app.domain.Strategy
 import com.avalanche.app.domain.paidThisMonthAmounts
 import com.avalanche.app.ui.buildPlan
+import com.avalanche.app.ui.monthlyDebtBudget
 import com.avalanche.app.util.editableNumber
 import com.avalanche.app.util.parseDecimal
 import kotlinx.coroutines.Dispatchers
@@ -51,6 +55,8 @@ data class PlanUiState(
     val avalanche: PayoffPlan? = null,
     val snowball: PayoffPlan? = null,
     val lump: LumpPreview? = null,
+    /** The savings account lined up with [selected]; null until savings are set up. */
+    val savings: SavingsProjection? = null,
 )
 
 class PlanViewModel(repo: DebtRepository, private val settingsStore: SettingsStore) : ViewModel() {
@@ -90,6 +96,7 @@ class PlanViewModel(repo: DebtRepository, private val settingsStore: SettingsSto
             avalanche = avalanche,
             snowball = snowball,
             lump = lumpPreview(debts, s, selected, parseDecimal(lumpInput) ?: 0.0, target, paid),
+            savings = s.savings?.let { SavingsProjector.project(it, selected, monthlyDebtBudget(debts, s.extraMonthly)) },
         )
     }
         .flowOn(Dispatchers.Default)
@@ -121,6 +128,10 @@ class PlanViewModel(repo: DebtRepository, private val settingsStore: SettingsSto
         extraText = text
         settingsStore.update { it.copy(extraMonthly = parseDecimal(text)?.coerceAtLeast(0.0) ?: 0.0) }
     }
+
+    fun saveSavings(setup: SavingsSetup) = settingsStore.update { it.copy(savings = setup) }
+
+    fun removeSavings() = settingsStore.update { it.copy(savings = null) }
 
     fun onLumpChanged(text: String) {
         lumpText = text

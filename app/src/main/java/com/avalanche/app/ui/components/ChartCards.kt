@@ -40,9 +40,12 @@ fun BalanceHistoryChart(history: List<BalancePoint>, modifier: Modifier = Modifi
 
 data class PlanLine(val label: String, val plan: PayoffPlan, val color: Color, val dashed: Boolean = false)
 
+/** A savings balance drawn on the projected balance chart: now (index 0), then the end of each month. */
+data class SavingsLine(val curve: List<Double>, val color: Color)
+
 /** Projected total balance by month for one or more plans. Plans that never converge are skipped. */
 @Composable
-fun ProjectedBalanceChart(lines: List<PlanLine>, modifier: Modifier = Modifier) {
+fun ProjectedBalanceChart(lines: List<PlanLine>, modifier: Modifier = Modifier, savings: SavingsLine? = null) {
     val money = LocalMoney.current
     val drawable = lines.filter { it.plan.converges && it.plan.months.isNotEmpty() }
     if (drawable.isEmpty()) {
@@ -60,13 +63,18 @@ fun ProjectedBalanceChart(lines: List<PlanLine>, modifier: Modifier = Modifier) 
             l.plan.balanceCurve().mapIndexed { i, b -> ChartPoint(i.toFloat(), b.toFloat()) },
             dashed = l.dashed,
         )
-    }
+    } + listOfNotNull(
+        savings?.takeIf { it.curve.size > 1 }?.let { s ->
+            ChartSeries("Savings", s.color, s.curve.mapIndexed { i, b -> ChartPoint(i.toFloat(), b.toFloat()) })
+        },
+    )
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         LineChart(
             series = series,
             xLabel = { if (it < 0.5f) "Now" else formatMonth(startPlan.monthAt(it.toInt())) },
             yLabel = { money.compact(it.toDouble()) },
-            description = "Projected total balance by month until debt-free",
+            description = if (savings == null) "Projected total balance by month until debt-free"
+            else "Projected total debt by month until debt-free, with your savings balance",
         )
         if (series.size > 1) ChartLegend(series)
     }

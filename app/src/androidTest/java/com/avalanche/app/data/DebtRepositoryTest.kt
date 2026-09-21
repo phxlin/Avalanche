@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.avalanche.app.domain.SavingsSetup
 import com.avalanche.app.domain.estimateInterestPaid
 import java.time.LocalDate
 import kotlinx.coroutines.runBlocking
@@ -648,5 +649,33 @@ class DebtRepositoryTest {
 
         assertEquals(0.0, debt(id).priorInterestPaid, 0.0)
         assertEquals(9000.0, debt(id).currentBalance, 0.0)
+    }
+
+    // ---------- savings ----------
+
+    private val savings = SavingsSetup(balance = 2500.5, monthlyIncome = 4200.0, percentSaved = 12.5, apy = 4.35)
+
+    @Test
+    fun deleteAllAlsoForgetsTheSavingsDetailsButKeepsOtherSettings() = runBlocking<Unit> {
+        settings.update { it.copy(currency = "EUR", savings = savings) }
+        addCard()
+
+        repo.deleteAll()
+
+        assertTrue(db.debtDao().getAll().isEmpty())
+        assertNull(settings.settings.value.savings)
+        assertEquals("EUR", settings.settings.value.currency)
+    }
+
+    @Test
+    fun theSavingsDetailsSurviveABackupRoundTrip() = runBlocking<Unit> {
+        settings.update { it.copy(savings = savings) }
+        addCard()
+        val json = repo.exportJson()
+
+        settings.update { it.copy(savings = null) }
+        repo.importJson(json)
+
+        assertEquals(savings, settings.settings.value.savings)
     }
 }

@@ -1,5 +1,6 @@
 package com.avalanche.app.ui
 
+import androidx.compose.material3.Text
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -35,8 +36,8 @@ class ComparisonCardTest {
     private val avalanche = PayoffCalculator.simulate(debts, 300.0, Strategy.AVALANCHE, start = start)
     private val snowball = PayoffCalculator.simulate(debts, 300.0, Strategy.SNOWBALL, start = start)
 
-    private fun show(current: Strategy, onSelect: (Strategy) -> Unit) =
-        compose.setContent { AvalancheTheme { ComparisonCard(avalanche, snowball, current, onSelect) } }
+    private fun show(current: Strategy, extra: @androidx.compose.runtime.Composable () -> Unit = {}, onSelect: (Strategy) -> Unit) =
+        compose.setContent { AvalancheTheme { ComparisonCard(avalanche, snowball, current, onSelect, extra) } }
 
     @Test
     fun tappingSnowballSelectsSnowball() {
@@ -74,5 +75,20 @@ class ComparisonCardTest {
         compose.onNodeWithText("Snowball").assertIsSelected()
         // Both boxes are radio-style choices, so a screen reader says so.
         compose.onAllNodes(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.RadioButton)).assertCountEquals(2)
+    }
+
+    @Test
+    fun theStrategyCardCarriesTheExtraFieldSoOneCardHoldsTheChoiceAndTheBudget() {
+        show(Strategy.AVALANCHE, extra = { Text("Extra per month") }) {}
+
+        compose.onNodeWithText("Strategy").assertExists()
+        compose.onNodeWithText("Extra per month").assertExists()
+    }
+
+    @Test
+    fun theCurrentStrategysDescriptionIsShown() {
+        show(Strategy.SNOWBALL) {}
+
+        compose.onNodeWithText(Strategy.SNOWBALL.blurb).assertExists()
     }
 }

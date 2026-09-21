@@ -100,7 +100,7 @@ class SettingsViewModel(
     fun deleteEverything() {
         viewModelScope.launch {
             repo.deleteAll()
-            _message.value = "All debts and payments deleted."
+            _message.value = "All debts, payments and savings details deleted."
         }
     }
 }

@@ -157,7 +157,7 @@ fun SettingsScreen() {
             SectionCard(title = "Your data", subtitle = "Stored only on this device. Export a backup so a lost phone doesn't mean lost history.") {
                 SettingRow(
                     title = "Export backup",
-                    subtitle = "Save a JSON file with all debts and payments",
+                    subtitle = "Save a JSON file with all debts, payments and settings",
                     modifier = Modifier.clickable { exportLauncher.launch("avalanche-backup-${LocalDate.now()}.json") },
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -169,7 +169,7 @@ fun SettingsScreen() {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 SettingRow(
                     title = "Delete all data",
-                    subtitle = "Remove every debt and payment from this device",
+                    subtitle = "Remove every debt, payment and savings detail from this device",
                     titleColor = MaterialTheme.colorScheme.error,
                     modifier = Modifier.clickable { showDelete = true },
                 )
@@ -214,7 +214,7 @@ fun SettingsScreen() {
     if (showDelete) {
         ConfirmDialog(
             title = "Delete all data?",
-            text = "Every debt and payment on this device will be permanently removed. Export a backup first if you might want it back.",
+            text = "Every debt and payment on this device, and your savings details, will be permanently removed. Export a backup first if you might want it back.",
             confirmLabel = "Delete everything",
             destructive = true,
             confirmPhrase = DELETE_CONFIRM_PHRASE,

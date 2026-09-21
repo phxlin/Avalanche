@@ -11,7 +11,7 @@ well as tappable (dark theme, Pixel 7 Pro):
 | Home                                                                                         | Debts                                                                                                                              | Plan                                                                                           | Charts                                                                                             | Debt detail                                                                                    |
 | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | ![Home dashboard](docs/screenshots/home.png)                                                 | ![Debts list](docs/screenshots/debts.png)                                                                                          | ![Payoff plan](docs/screenshots/plan.png)                                                      | ![Projected balance and payoff timeline](docs/screenshots/charts.png)                              | ![Debt detail](docs/screenshots/debt-detail.png)                                               |
-| Total remaining, progress, the projected debt-free date, and interest paid vs. still to come | Every debt as a card, revolving and installment tinted apart, tagged with where the extra goes and what is already paid this month | Avalanche or snowball, your extra per month, and a tappable side-by-side comparison of the two | Projected balance for both strategies, and a payoff timeline sorted by when each debt reaches zero | Balance and progress, interest paid so far (with an estimate), log a payment, projected payoff |
+| Total remaining, progress, the projected debt-free date, and interest paid vs. still to come | Every debt as a card, revolving and installment tinted apart, tagged with where the extra goes and what is already paid this month | The debt-free date, then avalanche vs. snowball as tappable boxes with your extra per month    | Projected balance for both strategies, and a payoff timeline sorted by when each debt reaches zero | Balance and progress, interest paid so far (with an estimate), log a payment, projected payoff |
 
 ## Requirements
 
@@ -29,7 +29,7 @@ well as tappable (dark theme, Pixel 7 Pro):
 
    ```bash
    ./gradlew :app:assembleDebug        # build the APK
-   ./gradlew :app:assembleRelease      # R8-shrunk release APK (debug-signed, see below)
+   ./gradlew :app:assembleRelease      # R8-shrunk release APK (signing: see below)
    ./gradlew :app:installDebug         # install on a running device/emulator
    ./gradlew :app:testDebugUnitTest    # JVM unit tests
    ./gradlew :app:connectedDebugAndroidTest   # instrumented + Compose UI tests (needs a device)
@@ -50,9 +50,10 @@ well as tappable (dark theme, Pixel 7 Pro):
    decimals) and progress starts there; the interest paid on the way is estimated.
 3. Made this month's payment already? Tick **This month's payment is already
    made** so the plan doesn't count it twice.
-4. Open the **Plan** tab: pick avalanche or snowball, add an extra amount per
-   month, and see the debt-free date, the side-by-side comparison, the payoff
-   timeline and the month-by-month schedule.
+4. Open the **Plan** tab: see the debt-free date, pick avalanche or snowball
+   (the two boxes compare their interest and payoff date), add an extra amount per
+   month, and scroll to the projected balance, the payoff timeline and the
+   month-by-month schedule. Optionally add your savings account there too.
 5. Log payments as you make them (one payment can be split across several debts);
    balances, interest and the projections update.
 
@@ -69,9 +70,21 @@ well as tappable (dark theme, Pixel 7 Pro):
   first) or **snowball** (smallest balance first), on a fixed monthly budget with
   minimums that roll over as debts clear. Both are shown side by side; tap either
   box to plan with it. See [How the numbers work](#how-the-numbers-work).
+* **A Plan tab that opens on the answer** — the debt-free date first, then the
+  strategy (the two tappable boxes and the extra-per-month field in one card), the
+  projected balance chart and the payoff timeline. The cards you use less often
+  (lump sum, where extra money goes) start folded, and a folded lump-sum card still
+  says when a preview is changing the chart.
 * **One-time lump sum** — auto-applied to the highest APR or aimed at a chosen
   debt, with a preview of the months and interest it saves; it can be logged as a
   real payment from there.
+* **Savings alongside the plan** — optional. Enter what's in your high-yield
+  savings account, your monthly income, the share of it you save and the account's
+  APY, and the projected balance chart gets a green savings line. The Plan tab says
+  when your savings pass what you still owe, what you'd have saved by the debt-free
+  month and how much of that is interest, and what your minimums plus extra come
+  to as a share of income. It never changes the debt plan. See
+  [How the numbers work](#how-the-numbers-work).
 * **Interest tracking** — interest paid so far (logged payments plus an estimate
   for the time before you started tracking) and interest still to come.
 * **Charts** — balance history and projected balance, and a payoff timeline sorted
@@ -81,7 +94,8 @@ well as tappable (dark theme, Pixel 7 Pro):
 * **Notifications** — an optional monthly reminder and a celebration when a debt
   reaches zero. Both are scheduled on the device.
 * **Settings** — currency, notification switches, JSON **export / import** of
-  everything through the system file picker, and a delete-everything option.
+  everything through the system file picker, and a delete-everything option that
+  asks you to type `DELETE`.
 * **Swipeable tabs** — the four top-level screens live in a `HorizontalPager`
   behind the bottom bar, so a swipe and a tap move between them in sync.
 * **Offline** — no network code at all.
@@ -97,9 +111,9 @@ is small enough that a DI framework isn't worth its weight.
 app/src/main/java/com/avalanche/app/
   AvalancheApplication.kt   Application + AppContainer (manual DI)
   data/         Room entities + DAOs, AppDatabase (v4, with migrations), DebtRepository,
-                SettingsStore (SharedPreferences), JSON Backup
+                SettingsStore (SharedPreferences, including the savings details), JSON Backup
   domain/       Pure Kotlin, unit tested: PayoffCalculator, PaymentMath,
-                PaidThisMonth, Summary (totals, balance history, interest estimate)
+                PaidThisMonth, Savings, Summary (totals, balance history, interest estimate)
   notifications/  Channels, payoff celebration, monthly reminder (WorkManager) + its timing rule
   ui/
     AppNav.kt   NavHost; the four tabs are pages of one HorizontalPager, and
@@ -142,6 +156,50 @@ runs through kapt, which is why `gradle.properties` keeps a few AGP 9 opt-outs
 (`android.builtInKotlin=false`, `android.newDsl=false`, …); moving Room to KSP
 would let them go.
 
+### Rate limiting & batching
+
+Avalanche makes no network requests, so there is no API to rate-limit, no retry or
+backoff logic and no keys. The same concerns show up locally, and are handled like
+this:
+
+* **Writes are batched in one Room transaction.** A payment session split across
+  several debts is logged in a single `withTransaction`, as are undo, editing a
+  debt (including its adjustment row), *Delete all data* and a backup restore. Either
+  every row lands or none does, and the UI sees one change, not one per row.
+* **Recalculation runs once per change, off the main thread.** Screen state is built
+  by `combine`-ing the Room flows, and the heavy ones (Home, Debt detail and Plan) are
+  computed on `Dispatchers.Default`. Each is shared through
+  `stateIn(WhileSubscribed(5_000))`, so a screen nobody is looking at does no work.
+  Typing in the extra-per-month or lump-sum field recomputes the plan on every
+  keystroke; that isn't debounced because a full simulation is cheap.
+* **Bounded work.** A plan simulation stops after 600 months (a debt whose minimum
+  doesn't cover its interest reports "not on track" instead of looping), and a backup
+  file is read in chunks and refused past 10 MB.
+* **One background job, not many.** The reminder is a single unique periodic
+  WorkManager request (every 6 hours, `KEEP` policy) that fires at most once per
+  month, not an alarm per debt. See [Reminders](#reminders).
+
+### Offline behavior
+
+The app is offline by design rather than by fallback: there is no sync to fail.
+
+* **Room is the only source of truth.** Nothing is cached or fetched, so there is no
+  stale data, no "last updated" state and no loading-from-network path. Every screen
+  works the same in airplane mode, on first launch and after a reboot.
+* **It can't reach the network even by accident.** There is no `INTERNET`
+  permission (see [Permissions](#permissions)) and no networking library in the
+  dependencies.
+* **What it still depends on:** the device clock. Interest accrual, the plan's first
+  month, "paid this month" and the reminder day all use the phone's date, so a wrong
+  clock skews them. Notifications need Android's permission. Backup export and
+  import go through the system file picker: whether a cloud provider listed there
+  touches the network is up to that provider, not the app.
+* **Reminders are scheduled on the device.** WorkManager keeps the periodic check
+  across reboots, and it needs no connectivity to run.
+* **Your data lives only on the phone.** `allowBackup` is off, so uninstalling
+  deletes it; export a backup file first if you might want it back (see
+  [Backup & restore](#backup--restore)).
+
 ### How the numbers work
 
 * **Payoff plan** — each month interest accrues (APR/12), every debt gets its
@@ -158,6 +216,16 @@ would let them go.
 * **Lump sum** — lands at the start of month 1, before interest. "Auto" aims it at
   the highest-APR debt regardless of the selected strategy; a specific debt gets
   it first, with any overflow going in avalanche order.
+* **Savings** — a projection drawn next to the plan, never part of it: the money you
+  save isn't taken out of the extra amount the plan uses. The account's stated APY
+  is converted to the monthly rate that compounds to it over twelve months (dividing
+  by 12 would overstate it). Each month the balance earns interest on what it held
+  at the start, then that month's saving (income × share) is deposited at the end.
+  The line runs to the selected plan's debt-free month and lines up with its balance
+  curve, month for month. "Savings pass what you owe" is the first month the savings
+  balance is at least the remaining debt; a balance that already covers everything
+  is said so instead. It is stored with the settings (no database migration), is
+  wiped by *Delete all data*, and is limited to a rate of 25% and a share of 100%.
 * **Logged payments** — split into interest and principal using simple daily
   interest at the debt's APR since the last payment (or since the debt was added
   or its balance last set). Payments cover interest first; a payment smaller than
@@ -202,27 +270,6 @@ would let them go.
   debts finish; the payoff timeline below it is sorted by finish date. A small
   low-APR debt can be cleared by its own minimum long before a big high-APR one.
 
-### Backup & restore
-
-Settings → **Your data** exports every debt and payment plus the settings to a plain
-JSON file through the system file picker (no storage permission needed), and
-restores from one after a confirmation.
-
-* **Format** — one JSON document with `app`, `version` and `exportedAt` headers.
-  Fields added in later versions are optional, so older backups still import.
-* **Restore replaces, and is all-or-nothing** — the whole file is validated first
-  (right app, not from a newer version, no negative amounts, no duplicate ids, every
-  payment pointing at a real debt) and only then are the tables replaced in one
-  Room transaction. A rejected file changes nothing and says why. Files over 10 MB
-  are refused.
-* **Delete all data** — the same section can wipe every debt and payment in one
-  transaction. The confirm button stays disabled until you type `DELETE` (any case),
-  so a stray tap can't erase everything. Export a backup first if you might want it
-  back.
-* **Not covered** — automatic or cloud backup. `allowBackup` is off so Android
-  doesn't copy the database anywhere, which means exporting a file is the only
-  backup, and it is plain, unencrypted JSON.
-
 ### Reminders
 
 The monthly reminder is a 6-hourly WorkManager check. It fires once per month on
@@ -239,6 +286,31 @@ permission. The WorkManager library merges in a few scheduling permissions of it
 own (boot receiver, wake lock, foreground service, network state) that it uses to
 run the reminder check.
 
+### Backup & restore
+
+Settings → **Your data** exports every debt and payment plus the settings to a plain
+JSON file through the system file picker (no storage permission needed), and
+restores from one after a confirmation.
+
+* **Format** — one JSON document with `app`, `version` and `exportedAt` headers.
+  Fields added in later versions are optional, so older backups still import.
+* **Restore replaces, and is all-or-nothing** — the whole file is validated first
+  (right app, not from a newer version, no negative amounts, no duplicate ids, every
+  payment pointing at a real debt) and only then are the tables replaced in one
+  Room transaction. A rejected file changes nothing and says why. Files over 10 MB
+  are refused.
+* **Delete all data** — the same section can wipe every debt and payment in one
+  transaction, and forgets your savings details too (income and balances are
+  personal). The confirm button stays disabled until you type `DELETE` (any case),
+  so a stray tap can't erase everything. Export a backup first if you might want it
+  back.
+* **Savings details** are part of the settings in a backup. A backup without them
+  (an older one, or one made before you set them up) leaves whatever is set here
+  alone, and an invalid block is ignored rather than rejecting the file.
+* **Not covered** — automatic or cloud backup. `allowBackup` is off so Android
+  doesn't copy the database anywhere, which means exporting a file is the only
+  backup, and it is plain, unencrypted JSON.
+
 ## Theming
 
 A glacier palette — blue-slate surfaces and snow-white text — in full light **and**
@@ -249,7 +321,7 @@ for Android 13+ themed icons; the notification icon is the mountain.
 
 ## Tests
 
-Unit (`./gradlew :app:testDebugUnitTest`, 93 tests):
+Unit (`./gradlew :app:testDebugUnitTest`, 122 tests):
 
 * `PayoffCalculatorTest` — amortisation maths, avalanche / snowball ordering and
   tie-breaks, minimums rolling over, lump sums, payoff-date ordering, the balance
@@ -261,27 +333,42 @@ Unit (`./gradlew :app:testDebugUnitTest`, 93 tests):
   debts' payments ignored
 * `PaymentMathAndHistoryTest` — interest / principal split, capping, balance
   history, totals, the interest estimate and the backup format round trip
-* `BackupTest` — the previous-APR and already-paid fields, and the import size limit
+* `BackupTest` — the previous-APR and already-paid fields, the savings block (round
+  trip, absent, invalid) and the import size limit
+* `SavingsTest` — the monthly rate compounding back to the APY, the month-by-month
+  curve, when savings pass the debt, the debt-free totals, plans with no payoff date
+  and the accepted ranges
+* `SavingsFormTest` — the savings form: required fields, ranges, decimal commas
+* `MonthlyDebtBudgetTest` — what goes to debt each month counts a cleared debt's
+  minimum, so the share-of-income line matches what the calculator spends
+* `BackupKeepRulesTest` — every backup DTO in `Backup.kt` has an R8 keep rule, so a
+  release build can't export renamed fields
 * `ImportPromptTest` — the import dialog only warns about replacing data when there is data
 * `DeleteConfirmationTest` — the typed word matches whatever its case or surrounding
   spaces, and nothing else does
-* `SettingsStoreTest` / `ReminderRuleTest` / `FormattersTest` — settings storage,
-  the reminder timing rule, and number / date / decimal-input handling
+* `SettingsStoreTest` / `ReminderRuleTest` / `FormattersTest` — settings storage
+  (including exact savings values and corrupt ones), the reminder timing rule, and
+  number / date / decimal-input handling
 
-Instrumented (`./gradlew :app:connectedDebugAndroidTest`, 69 tests):
+Instrumented (`./gradlew :app:connectedDebugAndroidTest`, 87 tests):
 
 * `DebtRepositoryTest` — the real repository on an in-memory Room database: payment
   splitting, undo, adjustments, rate changes (including a 0% promo ending),
   the percent-paid rules, rejected backdated payments, the already-paid marker, and
-  export / import
+  export / import, and delete-all clearing the savings details
 * `MigrationTest` — real v1 → v2 → v3 → v4 data-survival checks against the exported
   schemas in `app/schemas`
 * `ViewModelTest` — the edit form, payment form and plan view models: save errors,
   prefilling without rounding, the already-paid box, the extra-amount field, and whether
-  Settings knows there is data to replace
+  Settings knows there is data to replace, and saving or removing savings on the plan
 * `DebtCardTest` / `ComparisonCardTest` — real Compose layout and touch input: three
   tags wrap without clipping the card, and tapping a strategy box selects it and is
-  announced as a selected radio choice
+  announced as a selected radio choice; the strategy card also carries the extra field
+* `CollapsibleCardTest` — a folded card shows its header but not its body, the header
+  toggles it, and it announces whether it is expanded
+* `SavingsCardTest` — the Plan tab's savings card and dialog: the invitation, the
+  crossover and debt-free lines, Save staying disabled until the form is valid,
+  a saved 0% rate or share reopening as "0", range messages and Remove
 * `ConfirmDialogTest` — the *Delete all data* confirm button stays disabled until
   `DELETE` is typed, does nothing while disabled, and Cancel never confirms
 
@@ -303,11 +390,11 @@ Instrumented (`./gradlew :app:connectedDebugAndroidTest`, 69 tests):
 
 ## Known limitations / TODO
 
-* **Backups are manual** — there's no automatic or cloud backup, and `allowBackup`
-  is off, so uninstalling deletes the data unless you exported a file first.
 * **Backdated payments** aren't allowed before a debt's last entry; a forgotten
   payment from before then can't be entered. Replaying history in date order would
   lift that, at the cost of the simple "undo the latest entry" model.
+* **Backups are manual** — there's no automatic or cloud backup, and `allowBackup`
+    is off, so uninstalling deletes the data unless you exported a file first.
 * **Ticked minimum and logged payments** — if you tick "already made" *and* log
   further payments in the same month, the larger of the two counts as paid, not
   their sum.
@@ -316,6 +403,9 @@ Instrumented (`./gradlew :app:connectedDebugAndroidTest`, 69 tests):
   previous month until something changes.
 * **Estimates** — the interest paid before tracking began is an approximation
   (see above), and all projections assume you keep paying the same amounts.
+* **Savings are a simple projection** — one account, a rate assumed to stay the same,
+  monthly compounding, no taxes on the interest, and income and the saved share held
+  constant. It says when the lines cross, not whether to save or pay debt first.
 * **Currency** — the currency setting changes how amounts are displayed; there is
   no conversion.
 * **kapt** — Room still uses kapt (hence the AGP opt-outs above); KSP would be
