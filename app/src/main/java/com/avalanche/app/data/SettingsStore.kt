@@ -2,6 +2,7 @@ package com.avalanche.app.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit
 import com.avalanche.app.domain.SavingsLimits
 import com.avalanche.app.domain.SavingsSetup
 import com.avalanche.app.domain.Strategy
@@ -62,37 +63,38 @@ class SettingsStore(private val prefs: SharedPreferences) {
     fun update(transform: (AppSettings) -> AppSettings) {
         val next = transform(_settings.value)
         _settings.value = next
-        prefs.edit()
-            .putString(KEY_CURRENCY, next.currency)
-            .putString(KEY_EXTRA, next.extraMonthly.toString())
-            .remove(KEY_EXTRA_LEGACY)
-            .putString(KEY_STRATEGY, next.strategy.name)
-            .putBoolean(KEY_REMINDERS, next.remindersEnabled)
-            .putInt(KEY_REMINDER_DAY, next.reminderDay.coerceIn(1, 28))
-            .putBoolean(KEY_CELEBRATE, next.celebrationsEnabled)
-            .also { edit ->
-                val savings = next.savings
-                if (savings == null) {
-                    edit.remove(KEY_SAVINGS_BALANCE).remove(KEY_SAVINGS_INCOME).remove(KEY_SAVINGS_PERCENT).remove(KEY_SAVINGS_APY)
-                } else {
-                    edit.putString(KEY_SAVINGS_BALANCE, savings.balance.toString())
-                    edit.putString(KEY_SAVINGS_INCOME, savings.monthlyIncome.toString())
-                    edit.putString(KEY_SAVINGS_PERCENT, savings.percentSaved.toString())
-                    edit.putString(KEY_SAVINGS_APY, savings.apy.toString())
-                }
+        prefs.edit {
+            putString(KEY_CURRENCY, next.currency)
+            putString(KEY_EXTRA, next.extraMonthly.toString())
+            remove(KEY_EXTRA_LEGACY)
+            putString(KEY_STRATEGY, next.strategy.name)
+            putBoolean(KEY_REMINDERS, next.remindersEnabled)
+            putInt(KEY_REMINDER_DAY, next.reminderDay.coerceIn(1, 28))
+            putBoolean(KEY_CELEBRATE, next.celebrationsEnabled)
+            val savings = next.savings
+            if (savings == null) {
+                remove(KEY_SAVINGS_BALANCE)
+                remove(KEY_SAVINGS_INCOME)
+                remove(KEY_SAVINGS_PERCENT)
+                remove(KEY_SAVINGS_APY)
+            } else {
+                putString(KEY_SAVINGS_BALANCE, savings.balance.toString())
+                putString(KEY_SAVINGS_INCOME, savings.monthlyIncome.toString())
+                putString(KEY_SAVINGS_PERCENT, savings.percentSaved.toString())
+                putString(KEY_SAVINGS_APY, savings.apy.toString())
             }
-            .apply()
+        }
     }
 
     /** Month for which the reminder notification has already fired. */
     var lastReminderMonth: YearMonth?
         get() = prefs.getString(KEY_LAST_REMINDER, null)?.let { runCatching { YearMonth.parse(it) }.getOrNull() }
-        set(value) = prefs.edit().putString(KEY_LAST_REMINDER, value?.toString()).apply()
+        set(value) = prefs.edit { putString(KEY_LAST_REMINDER, value?.toString()) }
 
     /** When reminders were last enabled or their day last changed; earlier due moments never fire. */
     var reminderScheduledAt: LocalDateTime?
         get() = prefs.getString(KEY_REMINDER_SCHEDULED_AT, null)?.let { runCatching { LocalDateTime.parse(it) }.getOrNull() }
-        set(value) = prefs.edit().putString(KEY_REMINDER_SCHEDULED_AT, value?.toString()).apply()
+        set(value) = prefs.edit { putString(KEY_REMINDER_SCHEDULED_AT, value?.toString()) }
 
     companion object {
         private const val KEY_CURRENCY = "currency"
