@@ -1,10 +1,19 @@
 package com.avalanche.app.ui.plan
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -15,18 +24,27 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.avalanche.app.domain.PayoffPlan
+import com.avalanche.app.domain.SavingsMilestone
 import com.avalanche.app.domain.SavingsProjection
+import com.avalanche.app.domain.SavingsProjector
 import com.avalanche.app.domain.SavingsSetup
 import com.avalanche.app.ui.components.DecimalField
+import com.avalanche.app.ui.components.ProgressBar
 import com.avalanche.app.ui.components.SectionCard
 import com.avalanche.app.ui.components.StatTile
 import com.avalanche.app.ui.components.money
+import com.avalanche.app.ui.theme.kindColors
 import com.avalanche.app.util.editableNumber
 import com.avalanche.app.util.formatApr
 import com.avalanche.app.util.formatMonth
@@ -92,6 +110,8 @@ internal fun SavingsCard(projection: SavingsProjection?, plan: PayoffPlan, onEdi
             "Your minimums plus the extra amount come to ${formatPercentPoints(projection.debtPaymentShare * 100.0)} of your income.",
             style = MaterialTheme.typography.bodyMedium,
         )
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        SavingsJourney(remember(setup) { SavingsProjector.milestones(setup) }, setup, plan)
         Text(
             "Estimates: the rate is assumed to stay the same, interest compounds monthly and taxes are ignored. Not financial advice.",
             style = MaterialTheme.typography.bodySmall,
@@ -100,6 +120,104 @@ internal fun SavingsCard(projection: SavingsProjection?, plan: PayoffPlan, onEdi
         TextButton(onClick = onEdit) { Text("Edit savings") }
     }
 }
+
+private val MILESTONE_DOT_SIZE = 18.dp
+private val MILESTONE_LABEL_WIDTH = 60.dp
+
+/**
+ * One progress bar for the whole savings journey, with a marker at each milestone along it (1, 3, 6 and 12 months of
+ * income). The bar's fill is the balance as a share of the furthest milestone; each marker fills in once its own,
+ * smaller target is reached, so the journey reads left to right like a trail with waypoints.
+ */
+@Composable
+private fun SavingsJourney(milestones: List<SavingsMilestone>, setup: SavingsSetup, plan: PayoffPlan) {
+    if (milestones.isEmpty()) return
+    val maxMonths = milestones.maxOf { it.months }.toFloat()
+    val overallProgress = (setup.balance / milestones.last().target).toFloat().coerceIn(0f, 1f)
+    val next = milestones.firstOrNull { !it.reached }
+
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text("Milestones", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Text(
+            if (next == null) {
+                "You've saved ${milestoneLabel(milestones.last().months)} — nice work."
+            } else {
+                val until = next.monthsUntilReached
+                "${money(setup.balance)} of ${money(next.target)} toward ${milestoneLabel(next.months)}" +
+                    if (until != null) " · ~${formatMonth(plan.monthAt(until))}" else " · not at this pace"
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        BoxWithConstraints(
+            Modifier
+                .fillMaxWidth()
+                .padding(top = 10.dp, bottom = 34.dp)
+                .semantics { contentDescription = journeyDescription(milestones, plan) },
+        ) {
+            val trackWidth = maxWidth - MILESTONE_DOT_SIZE
+            ProgressBar(overallProgress, MaterialTheme.kindColors.savings, Modifier.align(Alignment.CenterStart))
+            milestones.forEach { milestone ->
+                val dotX = trackWidth * (milestone.months / maxMonths).coerceIn(0f, 1f)
+                Box(
+                    Modifier
+                        .align(Alignment.CenterStart)
+                        .offset(x = dotX)
+                        .size(MILESTONE_DOT_SIZE)
+                        .clip(CircleShape)
+                        .background(if (milestone.reached) MaterialTheme.kindColors.savings else MaterialTheme.colorScheme.surfaceContainerLow)
+                        .border(2.dp, if (milestone.reached) MaterialTheme.kindColors.savings else MaterialTheme.colorScheme.outline, CircleShape),
+                )
+                val labelX = (dotX + MILESTONE_DOT_SIZE / 2 - MILESTONE_LABEL_WIDTH / 2).coerceIn(0.dp, maxWidth - MILESTONE_LABEL_WIDTH)
+                Column(
+                    Modifier
+                        .align(Alignment.TopStart)
+                        .offset(x = labelX, y = MILESTONE_DOT_SIZE + 4.dp)
+                        .width(MILESTONE_LABEL_WIDTH),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        milestoneShortLabel(milestone.months),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = if (milestone.reached) FontWeight.Bold else FontWeight.Normal,
+                        maxLines = 1,
+                    )
+                    val until = milestone.monthsUntilReached
+                    Text(
+                        when {
+                            milestone.reached -> "Reached"
+                            until != null -> formatMonth(plan.monthAt(until))
+                            else -> "—"
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (milestone.reached) MaterialTheme.kindColors.savings else MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun milestoneLabel(months: Int): String = when {
+    months == 1 -> "1 month of income"
+    months == 12 -> "1 year of income"
+    months % 12 == 0 -> "${months / 12} years of income"
+    else -> "$months months of income"
+}
+
+/** The tag under each marker on the journey bar: "1mo", "3mo", "1yr". */
+private fun milestoneShortLabel(months: Int): String = if (months % 12 == 0) "${months / 12}yr" else "${months}mo"
+
+private fun journeyDescription(milestones: List<SavingsMilestone>, plan: PayoffPlan): String =
+    "Savings journey. " + milestones.joinToString(" ") { milestone ->
+        val status = when {
+            milestone.reached -> "reached"
+            milestone.monthsUntilReached != null -> "about ${formatMonth(plan.monthAt(milestone.monthsUntilReached))}"
+            else -> "not reached at this pace"
+        }
+        "${milestoneLabel(milestone.months)}: $status."
+    }
 
 private fun zeroAsText(value: Double): String = if (value == 0.0) "0" else editableNumber(value)
 

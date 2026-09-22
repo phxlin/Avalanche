@@ -69,7 +69,8 @@ well as tappable (dark theme, Pixel 7 Pro):
 * **Payoff plan** — month-by-month schedule under **avalanche** (highest APR
   first) or **snowball** (smallest balance first), on a fixed monthly budget with
   minimums that roll over as debts clear. Both are shown side by side; tap either
-  box to plan with it. See [How the numbers work](#how-the-numbers-work).
+  box to plan with it; the interest line under the boxes is worded from the strategy
+  in use ("Avalanche saves …" or "Snowball costs … more"). See [How the numbers work](#how-the-numbers-work).
 * **A Plan tab that opens on the answer** — the debt-free date first, then the
   strategy (the two tappable boxes and the extra-per-month field in one card), the
   projected balance chart and the payoff timeline. The cards you use less often
@@ -83,7 +84,9 @@ well as tappable (dark theme, Pixel 7 Pro):
   APY, and the projected balance chart gets a green savings line. The Plan tab says
   when your savings pass what you still owe, what you'd have saved by the debt-free
   month and how much of that is interest, and what your minimums plus extra come
-  to as a share of income. It never changes the debt plan. See
+  to as a share of income. A single **journey bar** marks savings milestones of one,
+  three, six and twelve months of income along it, each with the month it is
+  reached. It never changes the debt plan. See
   [How the numbers work](#how-the-numbers-work).
 * **Interest tracking** — interest paid so far (logged payments plus an estimate
   for the time before you started tracking) and interest still to come.
@@ -224,7 +227,12 @@ The app is offline by design rather than by fallback: there is no sync to fail.
   The line runs to the selected plan's debt-free month and lines up with its balance
   curve, month for month. "Savings pass what you owe" is the first month the savings
   balance is at least the remaining debt; a balance that already covers everything
-  is said so instead. It is stored with the settings (no database migration), is
+  is said so instead. A milestone is a multiple of monthly income (1, 3, 6 or 12
+  months); the journey bar fills to the balance's share of the furthest one, with a
+  marker at each milestone's own position along that same scale, filled in once its
+  target is met. A marker's date is the first month the projected balance reaches it
+  (looked for up to 50 years ahead, otherwise "not at this pace"). Milestones don't
+  depend on the debt plan. It is stored with the settings (no database migration), is
   wiped by *Delete all data*, and is limited to a rate of 25% and a share of 100%.
 * **Logged payments** — split into interest and principal using simple daily
   interest at the debt's APR since the last payment (or since the debt was added
@@ -321,7 +329,7 @@ for Android 13+ themed icons; the notification icon is the mountain.
 
 ## Tests
 
-Unit (`./gradlew :app:testDebugUnitTest`, 122 tests):
+Unit (`./gradlew :app:testDebugUnitTest`, 135 tests):
 
 * `PayoffCalculatorTest` — amortisation maths, avalanche / snowball ordering and
   tie-breaks, minimums rolling over, lump sums, payoff-date ordering, the balance
@@ -338,6 +346,11 @@ Unit (`./gradlew :app:testDebugUnitTest`, 122 tests):
 * `SavingsTest` — the monthly rate compounding back to the APY, the month-by-month
   curve, when savings pass the debt, the debt-free totals, plans with no payoff date
   and the accepted ranges
+* `SavingsMilestonesTest` — the 1 / 3 / 6 / 12-month targets, progress capped at full,
+  a target met exactly counting as reached, months until each one with and without
+  interest (matching the savings curve), and never or beyond 50 years
+* `InterestVerdictTest` — the "saves / costs more in interest" line is worded from the
+  strategy in use and flips when it changes
 * `SavingsFormTest` — the savings form: required fields, ranges, decimal commas
 * `MonthlyDebtBudgetTest` — what goes to debt each month counts a cleared debt's
   minimum, so the share-of-income line matches what the calculator spends
@@ -350,7 +363,7 @@ Unit (`./gradlew :app:testDebugUnitTest`, 122 tests):
   (including exact savings values and corrupt ones), the reminder timing rule, and
   number / date / decimal-input handling
 
-Instrumented (`./gradlew :app:connectedDebugAndroidTest`, 87 tests):
+Instrumented (`./gradlew :app:connectedDebugAndroidTest`, 95 tests):
 
 * `DebtRepositoryTest` — the real repository on an in-memory Room database: payment
   splitting, undo, adjustments, rate changes (including a 0% promo ending),
@@ -363,12 +376,14 @@ Instrumented (`./gradlew :app:connectedDebugAndroidTest`, 87 tests):
   Settings knows there is data to replace, and saving or removing savings on the plan
 * `DebtCardTest` / `ComparisonCardTest` — real Compose layout and touch input: three
   tags wrap without clipping the card, and tapping a strategy box selects it and is
-  announced as a selected radio choice; the strategy card also carries the extra field
+  announced as a selected radio choice; the strategy card also carries the extra field,
+  and its interest line follows the selection
 * `CollapsibleCardTest` — a folded card shows its header but not its body, the header
   toggles it, and it announces whether it is expanded
 * `SavingsCardTest` — the Plan tab's savings card and dialog: the invitation, the
   crossover and debt-free lines, Save staying disabled until the form is valid,
-  a saved 0% rate or share reopening as "0", range messages and Remove
+  a saved 0% rate or share reopening as "0", the journey bar's milestone tags and
+  captions, range messages and Remove
 * `ConfirmDialogTest` — the *Delete all data* confirm button stays disabled until
   `DELETE` is typed, does nothing while disabled, and Cancel never confirms
 

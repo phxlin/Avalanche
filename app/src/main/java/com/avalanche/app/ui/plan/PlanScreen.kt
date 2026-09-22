@@ -48,6 +48,7 @@ import com.avalanche.app.data.DebtEntity
 import com.avalanche.app.domain.MonthPlan
 import com.avalanche.app.domain.PayoffPlan
 import com.avalanche.app.domain.Strategy
+import com.avalanche.app.domain.interestVerdict
 import com.avalanche.app.ui.components.CollapsibleCard
 import com.avalanche.app.ui.components.DecimalField
 import com.avalanche.app.ui.components.EmptyState
@@ -299,13 +300,22 @@ internal fun ComparisonCard(
             ComparisonColumn(snowball, highlighted = current == Strategy.SNOWBALL, onClick = { onSelect(Strategy.SNOWBALL) }, modifier = Modifier.weight(1f))
         }
         Text(current.blurb, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        val verdict = when {
-            !avalanche.converges || !snowball.converges -> null
-            snowball.totalInterest - avalanche.totalInterest >= 0.5 ->
-                "Avalanche saves ${money(snowball.totalInterest - avalanche.totalInterest)} in interest."
-            else -> "Both cost about the same interest with your debts."
+        // Worded from the strategy in use, so switching between the boxes changes it.
+        val verdict = interestVerdict(current, avalanche, snowball)
+        if (verdict != null) {
+            val other = verdict.other.label.lowercase()
+            val text = when {
+                verdict.isAboutTheSame -> "Both cost about the same interest with your debts."
+                verdict.saved > 0 -> "${verdict.chosen.label} saves ${money(verdict.saved)} in interest compared with $other."
+                else -> "${verdict.chosen.label} costs ${money(-verdict.saved)} more in interest than $other."
+            }
+            Text(
+                text,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = if (verdict.saved < 0 && !verdict.isAboutTheSame) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
+            )
         }
-        if (verdict != null) Text(verdict, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.primary)
         val firstA = avalanche.payoffMonthIndex.values.minOrNull()
         val firstS = snowball.payoffMonthIndex.values.minOrNull()
         if (firstA != null && firstS != null && firstS < firstA) {

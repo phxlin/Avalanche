@@ -1,10 +1,12 @@
 package com.avalanche.app.ui
 
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -163,5 +165,51 @@ class SavingsCardTest {
         compose.onNodeWithText("Save").assertIsEnabled()
         compose.onAllNodes(hasSetTextAction())[2].assertTextContains("0")
         compose.onAllNodes(hasSetTextAction())[3].assertTextContains("0")
+    }
+
+    // ---------- the savings journey bar ----------
+
+    @Test
+    fun theJourneyBarShowsATagForEachMilestone() {
+        showCard(SavingsProjector.project(setup, plan, monthlyDebtPayment = 100.0))
+
+        compose.onNodeWithText("Milestones").assertExists()
+        compose.onNodeWithText("1mo").assertExists()
+        compose.onNodeWithText("3mo").assertExists()
+        compose.onNodeWithText("6mo").assertExists()
+        compose.onNodeWithText("1yr").assertExists()
+    }
+
+    @Test
+    fun theCaptionNamesTheNextUnreachedMilestone() {
+        // Nothing is reached yet (balance 0), so the caption is built around the smallest one.
+        showCard(SavingsProjector.project(setup, plan, monthlyDebtPayment = 100.0))
+
+        compose.onNodeWithText("toward 1 month of income", substring = true).assertExists()
+        compose.onAllNodesWithText("Reached").assertCountEquals(0)
+    }
+
+    @Test
+    fun aMilestoneAlreadyMetIsMarkedReachedAndTheOthersAreNot() {
+        // 5,000 saved on a 2,000 income: one month (2,000) is met, three months (6,000) is not.
+        showCard(SavingsProjector.project(setup.copy(balance = 5000.0), plan, monthlyDebtPayment = 100.0))
+
+        compose.onAllNodesWithText("Reached").assertCountEquals(1)
+    }
+
+    @Test
+    fun allMilestonesMetSwapsTheCaptionForACelebration() {
+        showCard(SavingsProjector.project(setup.copy(balance = 30_000.0), plan, monthlyDebtPayment = 100.0))
+
+        compose.onNodeWithText("nice work", substring = true).assertExists()
+        compose.onAllNodesWithText("Reached").assertCountEquals(4)
+    }
+
+    @Test
+    fun aMilestoneThatNeverArrivesAtThisPaceShowsADashInsteadOfADate() {
+        showCard(SavingsProjector.project(setup.copy(percentSaved = 0.0), plan, monthlyDebtPayment = 100.0))
+
+        compose.onAllNodesWithText("—").assertCountEquals(4)
+        compose.onNodeWithText("not at this pace", substring = true).assertExists()
     }
 }

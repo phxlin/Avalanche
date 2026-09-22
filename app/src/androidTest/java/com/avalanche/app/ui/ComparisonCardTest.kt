@@ -1,6 +1,8 @@
 package com.avalanche.app.ui
 
 import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -90,5 +92,50 @@ class ComparisonCardTest {
         show(Strategy.SNOWBALL) {}
 
         compose.onNodeWithText(Strategy.SNOWBALL.blurb).assertExists()
+    }
+
+    // Debts on which the two strategies differ: a big high-rate card and a small low-rate loan.
+    private val differingDebts = listOf(
+        PlanDebt(1, "Big card", true, 10_000.0, 25.0, 250.0),
+        PlanDebt(2, "Small loan", false, 1_000.0, 5.0, 50.0),
+    )
+    private val differingAvalanche = PayoffCalculator.simulate(differingDebts, 300.0, Strategy.AVALANCHE, start = start)
+    private val differingSnowball = PayoffCalculator.simulate(differingDebts, 300.0, Strategy.SNOWBALL, start = start)
+
+    private fun showDiffering(current: Strategy) = compose.setContent {
+        AvalancheTheme { ComparisonCard(differingAvalanche, differingSnowball, current, onSelect = {}) }
+    }
+
+    @Test
+    fun theInterestLineSaysAvalancheSavesWhileAvalancheIsInUse() {
+        showDiffering(Strategy.AVALANCHE)
+
+        compose.onNodeWithText("Avalanche saves", substring = true).assertExists()
+        compose.onNodeWithText("compared with snowball", substring = true).assertExists()
+        compose.onNodeWithText("Snowball costs", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun theInterestLineChangesToWhatSnowballCostsWhenSnowballIsInUse() {
+        // Regression: the line always said "Avalanche saves ..." whichever strategy was selected.
+        showDiffering(Strategy.SNOWBALL)
+
+        compose.onNodeWithText("Snowball costs", substring = true).assertExists()
+        compose.onNodeWithText("more in interest than avalanche", substring = true).assertExists()
+        compose.onNodeWithText("Avalanche saves", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun theInterestLineFollowsTheSelectionAsItChanges() {
+        var current by androidx.compose.runtime.mutableStateOf(Strategy.AVALANCHE)
+        compose.setContent {
+            AvalancheTheme { ComparisonCard(differingAvalanche, differingSnowball, current, onSelect = { current = it }) }
+        }
+        compose.onNodeWithText("Avalanche saves", substring = true).assertExists()
+
+        compose.onNodeWithText("Snowball").performClick()
+
+        compose.onNodeWithText("Snowball costs", substring = true).assertExists()
+        compose.onNodeWithText("Avalanche saves", substring = true).assertDoesNotExist()
     }
 }

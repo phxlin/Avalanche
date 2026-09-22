@@ -35,6 +35,21 @@ object SavingsLimits {
     }
 }
 
+/**
+ * A "months of income saved" target on the way to a full cushion (1, 3, 6 or 12 months of what you take home).
+ * [monthsUntilReached] counts from now: 0 once the balance is already there, null if it isn't reached within
+ * [SavingsProjector.MILESTONE_HORIZON_MONTHS] at this pace.
+ */
+data class SavingsMilestone(
+    val months: Int,
+    val target: Double,
+    /** Saved so far as a share of [target], 0..1. */
+    val progress: Float,
+    val monthsUntilReached: Int?,
+) {
+    val reached: Boolean get() = monthsUntilReached == 0
+}
+
 /** What the savings account looks like next to a debt payoff plan. */
 data class SavingsProjection(
     val setup: SavingsSetup,
@@ -53,6 +68,15 @@ data class SavingsProjection(
 )
 
 object SavingsProjector {
+    /** The cushion sizes shown as milestones: one, three, six and twelve months of income. */
+    val MILESTONE_MONTHS = listOf(1, 3, 6, 12)
+
+    /** How far ahead a milestone is looked for: 50 years. Past that it counts as not reached. */
+    const val MILESTONE_HORIZON_MONTHS = 600
+
+    /** Half a cent of slack, so a balance that is exactly at the target isn't missed by rounding. */
+    private const val REACHED_TOLERANCE = 0.005
+
     /**
      * The monthly rate that compounds to [apy] over twelve months. APY already includes compounding, so dividing it
      * by 12 would overstate the yield.
@@ -73,6 +97,32 @@ object SavingsProjector {
             out.add(balance)
         }
         return out
+    }
+
+    /** The milestones for [setup], smallest first. They depend only on income and the account, not on the debt plan. */
+    fun milestones(setup: SavingsSetup, tiers: List<Int> = MILESTONE_MONTHS): List<SavingsMilestone> = tiers.map { months ->
+        val target = setup.monthlyIncome * months
+        SavingsMilestone(
+            months = months,
+            target = target,
+            progress = (setup.balance / target).coerceIn(0.0, 1.0).toFloat(),
+            monthsUntilReached = monthsUntil(setup, target),
+        )
+    }
+
+    /**
+     * Months from now until the balance reaches [target]: 0 if it already has, otherwise the first month whose end balance
+     * does (the same month numbering as [curve]), or null if that takes longer than [MILESTONE_HORIZON_MONTHS].
+     */
+    fun monthsUntil(setup: SavingsSetup, target: Double): Int? {
+        if (setup.balance >= target - REACHED_TOLERANCE) return 0
+        val rate = monthlyRate(setup.apy)
+        var balance = setup.balance
+        for (month in 1..MILESTONE_HORIZON_MONTHS) {
+            balance = balance * (1.0 + rate) + setup.monthlyContribution
+            if (balance >= target - REACHED_TOLERANCE) return month
+        }
+        return null
     }
 
     /**
