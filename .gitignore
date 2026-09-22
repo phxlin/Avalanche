@@ -24,3 +24,6 @@ gradle/gradle-daemon-jvm.properties
 *.jks
 *.keystore
 keystore.properties
+
+# Local verification/build-log scratch files, not part of the project
+verification-*.log
